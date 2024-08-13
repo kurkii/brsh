@@ -1,6 +1,7 @@
 BASE = src/main.c src/parser.c src/error.c src/pipe.c src/builtin.c
 BUILD = target
-CFLAGS = -Wall -Wextra -Wpedantic
+CFLAGS = -Wall -Wno-unused-parameter -Wextra
+
 all:
 	mkdir target || true
 	gcc $(BASE) $(CFLAGS) -o $(BUILD)/brsh

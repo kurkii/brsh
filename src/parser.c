@@ -55,7 +55,6 @@ void parse_buffer(char *buffer){
         char *string = &buffer[k];
         switch (buffer[i]) {
             case '|':
-                //printf("string: %s\n", string);
                 buffer[i] = '\0';
                 i++; // go to the next character as this one is null terminated
                 
@@ -65,8 +64,6 @@ void parse_buffer(char *buffer){
                 block_array[block_count] = string;
                 delimiter_count++;
                 block_count++;
-
-                //printf("string %lu: %s\n", k, string);
 
                 k = i; // equalize k, since the next block will start at that character (current i)
                 break;
@@ -81,8 +78,6 @@ void parse_buffer(char *buffer){
                 delimiter_count++;
                 block_count++;
 
-                //printf("string %lu: %s\n", k, string);
-
                 k = i;
                 break;
             case '\0': // end of string
@@ -91,7 +86,6 @@ void parse_buffer(char *buffer){
                 block_array[block_count] = string;
                 block_count++;
 
-                //printf("string %lu: %s\n", k, &buffer[k]);
                 return;
 
             default:
@@ -111,13 +105,6 @@ void parse_buffer(char *buffer){
 
 */
 
-
-
-/*
-
-    TO FIX: fix weird shit
-
-*/
 command_info parse_block(block buffer){
 
     if(buffer == NULL){
@@ -159,10 +146,10 @@ command_info parse_block(block buffer){
         k++;
         j++;
     }
-    //printf("test1\n");
-    string_array[i++] = NULL; // last argument of argv[] is NULL
-/*     printf("test2\n");
-    printf("string_array[0]: %s\n", string_array[0]); */
+
+    free(string_array[i]); // free it since the assignment to NULL will prevent it from being freed
+    string_array[i] = NULL; // last argument of argv[] is NULL
+
     command.argv = string_array; // pointer to strings is equal to an argv
     command.argc = i; // the number of commands is equal to an argc
 
@@ -206,7 +193,6 @@ char *parse_path(char *command){
     char *concat = malloc(BUFFER_SIZE * sizeof(char)); // <- remember to free
 
     if(fopen(command, "r") != NULL){ // if the command itself points to a file
-
         memcpy(concat, command, strlen(command)+1); // the reason we return concat instead of directly returning command is because of a free() in the callee, which would cause a double free error
         return concat;
     }
@@ -238,6 +224,14 @@ char *parse_path(char *command){
 
 }
 
+
+/*
+    parse_prompt()
+
+    - primitive prompt creator with the layout `user@hostname: `, will probably be removed/refactored
+    with config settings
+
+*/
 char *parse_prompt(void){
     #define PROMPT_DELIMITER "@"
     char *username = getlogin();
@@ -252,7 +246,7 @@ char *parse_prompt(void){
     }
 
     if((strlen(username) + strlen(hostname)) > BUFFER_SIZE){
-        error_kill("parse_prompt()", "buffer too small");
+        error_kill("parse_prompt()", "buffer too small - blame me for being lazy");
     }
 
     char *concat = malloc(BUFFER_SIZE * sizeof(char)); // FREEEEEEE
