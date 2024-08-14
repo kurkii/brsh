@@ -18,6 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "brsh.h"
+#include "config.h"
 char buffer[BUFFER_SIZE];
 
 block block_array[BUFFER_SIZE] = {NULL};
@@ -27,6 +28,13 @@ uint16_t delimiter_count = 0;
 
 int main(){
     
+    config_initial_setup();
+    get_config_path();
+    if(read_config() != 0){
+        printf("Failed to read config, bailing.\n");
+        exit(1);
+    }
+
     char* prompt = parse_prompt();
 
     for(;;){
@@ -54,6 +62,7 @@ int main(){
             }; 
 
             char *executable = parse_path(command.argv[0]);
+
 
             if(executable == NULL){
                 for(size_t x = 0; x < BUFFER_SIZE; x++){
@@ -121,7 +130,6 @@ int main(){
         block_count = 0;
         strcpy(delimiter_array, "");
         delimiter_count = 0;
-        break;
     }
 
     free(prompt);

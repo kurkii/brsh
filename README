@@ -1,0 +1,8 @@
+# brsh - bird shell #
+
+brsh is a shell for the Linux kernel
+
+## TO-DO ##
+
+- Redirections
+- Command history
