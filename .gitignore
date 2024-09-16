@@ -1,2 +1,4 @@
 target/
 valgrind-out.txt
+test.c
+a.out

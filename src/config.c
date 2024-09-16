@@ -33,26 +33,6 @@
 #include <pwd.h>
 #include "config.h"
 
-typedef struct {
-    char *name; // the string literal which the key is referred to in the config
-    uint8_t type; // type of value that the key accepts (int, string, float)
-    union {
-        char string_value[VALUE_STRING_SIZE];
-        int int_value;
-        float float_value;
-        char bool_value[VALUE_BOOL_SIZE];
-    };
-} brsh_key;
-
-enum {
-    KEY_TYPE_INT = 0,
-    KEY_TYPE_STRING = 1,
-    KEY_TYPE_FLOAT = 2,
-    KEY_TYPE_BOOL = 3
-};
-
-#define KEY_NUM 4
-
 brsh_key keys[KEY_NUM] = {0};
 
 char config_path[PATH_MAX] = {0}; // Path to the config file
@@ -87,10 +67,7 @@ void set_key(int index, char *name, int type){
 */
 
 void config_initial_setup(){
-    set_key(0, "path", KEY_TYPE_STRING);
-    set_key(1, "test", KEY_TYPE_STRING);
-    set_key(2, "duck", KEY_TYPE_STRING);
-    set_key(3, "FUICK", KEY_TYPE_INT);
+    set_key(BRSH_KEY_PATH_INDEX, "path", KEY_TYPE_STRING);
 }
 
 void get_config_path(){
@@ -100,7 +77,14 @@ void get_config_path(){
     strcat(config_path, CONFIG_FILENAME);
     return;
 } 
+/*
 
+    read_config()
+
+    - reads the config file and parses its contents. the values of the config are stored in the `keys` array
+
+
+*/
 int read_config(){
     FILE *fileptr;
 
@@ -109,13 +93,14 @@ int read_config(){
     int line_num = 0; // line counter
 
     fileptr = fopen(config_path, "r");
-    printf("config_path: %s\n", config_path);
+
     if(fileptr == NULL){
-        fileptr = fopen(config_path, "w");
+        fileptr = fopen(config_path, "w"); // if the config file doesn't exist, then create it
 
         if(fileptr == NULL){
             int error = errno;
             printf("brsh: %s: %s: %s\n", "read_config()", "fopen()", strerror(error));
+            return -1;
         }
     }
     char *key = malloc(KEY_LENGTH*sizeof(char));
@@ -133,8 +118,30 @@ int read_config(){
             if(line[i] == '='){
                 line[i] = '\0'; // set the NUL character of the key string
                 i++;
-                memcpy(key, line, strlen(line)); // copies the line to the point of the newly set NUL character
-                memcpy(value, line+i*sizeof(char), full_str_length-strlen(line)); // offsets line and copies whatever is left of the line into `value`
+
+                unsigned long key_str_length = strlen(line); // strlen of the key
+
+                if(key_str_length > KEY_LENGTH){
+                    printf("CONFIG ERROR: key length at line %d is over the maximum (%d)", line_num, KEY_LENGTH);
+                    fclose(fileptr);
+                    free(key);
+                    free(value);
+                    return -1;
+                }
+
+                memcpy(key, line, key_str_length); // copies the line to the point of the newly set NUL character
+
+                unsigned long value_str_length = full_str_length - key_str_length; // the length of the value is the length of the line minus the length of the key
+
+                if(value_str_length > VALUE_LENGTH){
+                    printf("CONFIG ERROR: value length at line %d is over the maximum (%d)", line_num, VALUE_LENGTH);
+                    fclose(fileptr);
+                    free(key);
+                    free(value);
+                    return -1;
+                }
+
+                memcpy(value, line+i*sizeof(char), value_str_length); // offsets line and copies whatever is left of the line into `value`
 
                 break;
             }
@@ -201,8 +208,19 @@ int read_config(){
     return 0;
 }
 
+
+/* writes a key-value pair to the config file*/
 int write_config(char* name, char* value){
-    
+    FILE *fileptr = fopen(config_path, "w");
+
+    if(fileptr == NULL){
+        int error = errno;
+        printf("brsh: %s: %s: %s\n", "write_config()", "fopen()", strerror(error));
+        return -1;
+    }
+
+    fprintf(fileptr, "%s=%s\n", name, value);
+    return 0;
 }
 
 /*
@@ -227,6 +245,18 @@ int keyname_to_index(char *name){
     }
 
     return -1;
+}
+
+/*
+    returns key[index]
+*/
+brsh_key get_key(int index){
+
+    if(index > KEY_NUM){
+        return (brsh_key){0};
+    }
+
+    return keys[index];
 }
 
 

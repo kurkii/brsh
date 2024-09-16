@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include "brsh.h"
 #include "config.h"
+#include "debug.h"
 char buffer[BUFFER_SIZE];
 
 block block_array[BUFFER_SIZE] = {NULL};
@@ -40,15 +41,19 @@ int main(){
     for(;;){
 
         printf("%s", prompt);
+
+
           
         fgets(buffer, BUFFER_SIZE, stdin);
 
         if(buffer[0] == 10){ // if input is empty
             continue;
         }
+        
+        //DEBUG_PRINTF("buffer: %s\n", buffer);
 
         parse_buffer(buffer);
-
+        
         if(delimiter_count == 0){ // if there is no piping/redirections happening, simply execute the command
             command_info command = parse_block(block_array[0]);
             
@@ -100,7 +105,8 @@ int main(){
   
             goto cleanup;
         }else{ // pipe the two commands (eventually replace this with a dynamic thing supporting multiple pipes)
-            command_info command1;
+            
+/*             command_info command1;
             command_info command2;
 
             command1 = parse_block(block_array[0]);
@@ -121,7 +127,16 @@ int main(){
             free(command2.argv);
 
             command1.argc = 0;
-            command2.argc = 0;
+            command2.argc = 0; */
+            command_info *commands = malloc(sizeof(command_info) * block_count);
+
+            for(size_t i = 0; i < block_count; i++){
+                commands[i] = parse_block(block_array[i]);
+            }
+
+            brsh_pipe(commands, delimiter_count, block_count);
+
+            free(commands);
 
         }
         cleanup:

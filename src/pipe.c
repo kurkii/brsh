@@ -26,6 +26,11 @@
     
 */
 
+enum{
+  READ = 0,
+  WRITE = 1,
+};
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,137 +38,146 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include "brsh.h"
+#include "debug.h"
 
-// fd[0] == stdin, fd[1] == stdout
 
-void pipe_two(char *argv1[], char *argv2[], int argc1, int argc2){
-  int pipefd[2];
-  
-  if(pipe(pipefd)){
-    error_kill("pipe_two()", "Failed to create pipe");
+int *create_pipefd(int num){
+  int *pipes = malloc(sizeof *pipes * num * 2); // allocate memory for the pipes
+  if(pipes == NULL){
+    perror("malloc() failed");
+    exit(EXIT_FAILURE);
   }
 
-  pid_t p1 = fork();
-
-  if (p1 < 0){
-    error_kill("pipe_two()", "p1: fork() failed");
-  }else{
-
-    if(p1 == 0){ // child
-      close(pipefd[0]); // close read end of the pipe
-
-      if(dup2(pipefd[1], 1) == -1){ // replace stdout with the write end of pipe
-        char *error = strerror(errno);
-        printf("brsh: pipe_two: dup2() at p1: %s", error);
-      }
-
-      char *executable = parse_path(argv1[0]); // finds executable in path
-
-      if(executable == NULL){
-        free(executable);
-        exit(1);
-      }
-
-      pid_t p3 = fork();
-
-      if(p3 < 0){
-        error_kill("pipe_two()", "p3: fork() failed");
-      }
-
-      if(p3 == 0){
-        if(execv(executable, argv1) == -1){
-          char *error = strerror(errno);
-          fprintf(stderr, "brsh: %s: %s\n", executable, error);
-          free(executable);
-          exit(1);
-        }
-      }
-
-      wait(NULL);
-      close(pipefd[1]);
-
-      free(executable);
-
-      exit(0);
-    }else{       // parent
-      //printf("am parent\n");
-
-      close(pipefd[1]);
-
-      //printf("forking second program:\n");
-      wait(NULL);
-      pid_t p2 = fork();
-      if(p2 < 0){
-        error_kill("pipe_two()", "p2: fork() failed");
-      }else{
-        if(p2 == 0){
-
-          close(pipefd[1]); // close write end of pipe
-
-          char *executable = parse_path(argv2[0]);
-
-          if(executable == NULL){
-            free(executable);
-            exit(1);
-          }
-
-          if(dup2(pipefd[0], 0) == -1){ // replace stdin with read end of pipe
-            char *error = strerror(errno);
-            printf("brsh: pipe_two: dup2() at p2: %s", error);
-            free(executable);
-            exit(1);
-          }
-
-          pid_t p4 = fork();
-
-          if(p4 < 0){
-            error_kill("pipe_two()", "p4: fork() failed");
-          }
-          
-          if(p4 == 0){
-            if(execv(executable, argv2) == -1){
-              char *error = strerror(errno);
-              fprintf(stderr, "brsh: %s: %s\n", executable, error);
-              free(executable);
-              exit(1);
-            }
-          }
-          wait(NULL);
-          close(pipefd[0]);
-          free(executable);
-          exit(0);
-        }
-        wait(NULL); // parent
-      }
+  for(size_t i = 0; i < num; i++){
+    if(pipe(pipes + i*2) == -1){ // create the pipes
+      perror("pipe() failed");
+      exit(EXIT_FAILURE);
     }
   }
-  wait(NULL);
-  return;
+
+  return pipes;
 }
 
-/*
-  read_pipe() and write_pipe() to be removed, they serve no use.
+bool configure_pipes(int *pipefd, int command, int pipe_count){
+    if(command == 0){
+      // first command
+      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1;
+    }else if(command == pipe_count){
+      // last command
+      return dup2(pipefd[(command-1)*2 + READ], STDIN_FILENO) != -1;
+    }else {
+      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1 &&
+      dup2(pipefd[(command-1) * 2 + READ], STDIN_FILENO) != -1;
+    }
+}
 
-*/
+int brsh_pipe(command_info *commandz, int pipe_counts, int command_counts){
+  int pipe_count = 2;
+  int command_count = 3;
+  command_info *commands = malloc(3 * sizeof(command_info));
+  commands[0].argv = malloc(4096 * sizeof *commands[0].argv);
+  commands[1].argv = malloc(4096 * sizeof *commands[1].argv);
+  commands[2].argv = malloc(4096 * sizeof *commands[2].argv);
+  
+  #define COMMAND_SIZE 512
+  for(size_t x = 0; x < BUFFER_SIZE; x++){
+      commands[0].argv[x] = malloc(COMMAND_SIZE*sizeof(char)); // malloc each element of the array seperately
+      memset(commands[0].argv[x], 0, COMMAND_SIZE); // zero out the memory
+      commands[1].argv[x] = malloc(COMMAND_SIZE*sizeof(char)); // malloc each element of the array seperately
+      memset(commands[1].argv[x], 0, COMMAND_SIZE); // zero out the memory
+      commands[2].argv[x] = malloc(COMMAND_SIZE*sizeof(char)); // malloc each element of the array seperately
+      memset(commands[2].argv[x], 0, COMMAND_SIZE); // zero out the memory
+  }
+
+  memcpy(commands[0].argv[0], "/bin/w", strlen("/bin/w"));
+  commands[0].argv[1] = NULL;
+  commands[0].argc = 1;
+
+  memcpy(commands[1].argv[0], "/bin/grep", strlen("/bin/grep"));
+  memcpy(commands[1].argv[1], "tty2", strlen("tty2"));
+  commands[1].argv[2] = NULL;
+  commands[1].argc = 2;
+
+  memcpy(commands[2].argv[0], "/bin/grep", strlen("/bin/grep"));
+  memcpy(commands[2].argv[1], "t", strlen("t"));
+  commands[2].argv[2] = NULL;
+  commands[2].argc = 2;
+
+  printf("commands[1].argv[1]: %s\n", commands[0].argv[0]);
+
+  printf("pipe_count 2: %d\n", pipe_count);
+  printf("command_count 2: %d\n", command_count);
+
+  for (int i = 0; i < command_count; i++) {
+    for(int j = 0; j < commands[i].argc+1; j++){
+      fprintf(stderr, "commands[%d].argv[%d]: %s\n", i, j, commands[i].argv[j]);
+    }
+  }
+
+  int* pipes = create_pipefd(pipe_count);
+
+  for(size_t i = 0; i < command_count; i++){
+    pid_t child = fork();
+
+    switch (child) {
+      case -1:
+        fprintf(stderr, "Failed to fork()");
+        exit(EXIT_FAILURE);
+      case 0:
+        /* child */
+
+        if(configure_pipes(pipes, i, pipe_count) == false){
+          perror("configure_pipes failed\n");
+          return 1;
+        }
+
+        for (size_t j = 0; j < pipe_count; j++) {
+          close(pipes[j*2+READ]);
+          close(pipes[j*2+WRITE]);
+        }
+
+        free(pipes);
+
+        if(execvp(commands[i].argv[0], commands[i].argv) != 0){
+          perror("execvp() failed");
+          exit(EXIT_FAILURE);
+        }
+
+        break;
+      default:
+        break;
+    }
+
+  }
+  return 0;
+}
+
+
 
 char *read_pipe(int filedes){
   char *output = malloc(BUFFER_SIZE * 512); // <- remember to free()!!
+
   char c;
   size_t i = 0;
   FILE *stream = fdopen(filedes, "r");
+
 
   if(stream == NULL){
     char *error = strerror(errno);
     error_kill("write_pipe()", error);
   }
 
+
   while ((c = fgetc(stream)) != EOF) { // parse the stream byte for byte and put it in the `output` buffer
+    
     output[i] = c;
     i++;
   }
 
   return output;
+  
 }
 
 void write_pipe(int filedes, char *input){
@@ -178,5 +192,20 @@ void write_pipe(int filedes, char *input){
     fputc(input[i], stream);
   }
 
+  return;
+}
+  //printf("pipe_count: %d\n", pipe_count);
+
+
+/* Writes an EOF to the specified file descriptor*/
+void write_EOF(int filedes){
+  FILE *stream = fdopen(filedes, "w");
+
+  if(stream == NULL){
+    error_kill("write_EOF()", strerror(errno));
+  }
+
+  fputc(EOF, stream);
+  fclose(stream);
   return;
 }

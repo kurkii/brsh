@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include "config.h"
 
 extern block block_array[BUFFER_SIZE]; // global block array from main.c file, used for storing blocks. the order of the elements [0-4096] is the order in which they appear in the buffer
 extern uint16_t block_count; // global counter of the amount of blocks stored in the block array
@@ -190,6 +191,11 @@ char *remove_whitespace(char *buffer){
 char *parse_path(char *command){
     _Bool file_found = 0;
     int error;
+    size_t x = 0; // ndex
+
+    brsh_key path_key = get_key(BRSH_KEY_PATH_INDEX);
+    char *path = path_key.string_value;
+
     char *concat = malloc(BUFFER_SIZE * sizeof(char)); // <- remember to free
 
     if(fopen(command, "r") != NULL){ // if the command itself points to a file
@@ -200,7 +206,17 @@ char *parse_path(char *command){
     for(size_t i = 0; i < PATH_ELEMENTS; i++){
 
         memset(concat, 0, BUFFER_SIZE*sizeof(char));
-        strcpy(concat, PATH[i]); // first copy the PATH element to concat
+        for(; x < PATH_MAX; x++){
+            if(path[x] == ':'){
+                path[x] = '\0';
+                x++;
+                break;
+            }
+
+            concat[x] = path[x];
+
+        }
+        
         strcat(concat, "/"); // add a slash
         strcat(concat, command); // then concatenate command
 
