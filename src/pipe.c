@@ -44,6 +44,7 @@ enum{
 
 
 int *create_pipefd(int num){
+  
   int *pipes = malloc(sizeof *pipes * num * 2); // allocate memory for the pipes
   if(pipes == NULL){
     perror("malloc() failed");
@@ -63,19 +64,22 @@ int *create_pipefd(int num){
 bool configure_pipes(int *pipefd, int command, int pipe_count){
     if(command == 0){
       // first command
-      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1;
+      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1; // first command, so we only write to stdout
     }else if(command == pipe_count){
       // last command
-      return dup2(pipefd[(command-1)*2 + READ], STDIN_FILENO) != -1;
+      return dup2(pipefd[(command-1)*2 + READ], STDIN_FILENO) != -1; // last command, so we only read from stdin
     }else {
-      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1 &&
+      return dup2(pipefd[command*2 + WRITE], STDOUT_FILENO) != -1 && // middle command, so we do both
       dup2(pipefd[(command-1) * 2 + READ], STDIN_FILENO) != -1;
     }
 }
 
 int brsh_pipe(command_info *commandz, int pipe_counts, int command_counts){
+  /*  ignore all user input, simply run the exact same code as other
+      program */
   int pipe_count = 2;
   int command_count = 3;
+  /* allocate memory for commands */
   command_info *commands = malloc(3 * sizeof(command_info));
   commands[0].argv = malloc(4096 * sizeof *commands[0].argv);
   commands[1].argv = malloc(4096 * sizeof *commands[1].argv);
@@ -90,7 +94,7 @@ int brsh_pipe(command_info *commandz, int pipe_counts, int command_counts){
       commands[2].argv[x] = malloc(COMMAND_SIZE*sizeof(char)); // malloc each element of the array seperately
       memset(commands[2].argv[x], 0, COMMAND_SIZE); // zero out the memory
   }
-
+  /* set the commands */
   memcpy(commands[0].argv[0], "/bin/w", strlen("/bin/w"));
   commands[0].argv[1] = NULL;
   commands[0].argc = 1;
@@ -110,14 +114,17 @@ int brsh_pipe(command_info *commandz, int pipe_counts, int command_counts){
   printf("pipe_count 2: %d\n", pipe_count);
   printf("command_count 2: %d\n", command_count);
 
+  /* debug prints*/
   for (int i = 0; i < command_count; i++) {
     for(int j = 0; j < commands[i].argc+1; j++){
       fprintf(stderr, "commands[%d].argv[%d]: %s\n", i, j, commands[i].argv[j]);
     }
   }
 
+  /* create the required pipes*/
   int* pipes = create_pipefd(pipe_count);
 
+  
   for(size_t i = 0; i < command_count; i++){
     pid_t child = fork();
 
@@ -128,11 +135,13 @@ int brsh_pipe(command_info *commandz, int pipe_counts, int command_counts){
       case 0:
         /* child */
 
+        
         if(configure_pipes(pipes, i, pipe_count) == false){
           perror("configure_pipes failed\n");
           return 1;
         }
 
+        /* close the pipes*/
         for (size_t j = 0; j < pipe_count; j++) {
           close(pipes[j*2+READ]);
           close(pipes[j*2+WRITE]);
