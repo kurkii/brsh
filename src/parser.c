@@ -14,7 +14,7 @@
         parse_block() - parse the blocks to get the commands and its arguments which is then used to execute the command
 
 */
-#include "brsh.h"
+
 #include <ctype.h>
 #include <linux/limits.h>
 #include <stdio.h>
@@ -23,7 +23,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
 #include "config.h"
+#include "brsh.h"
 
 extern block block_array[BUFFER_SIZE]; // global block array from main.c file, used for storing blocks. the order of the elements [0-4096] is the order in which they appear in the buffer
 extern uint16_t block_count; // global counter of the amount of blocks stored in the block array
@@ -189,7 +191,7 @@ char *remove_whitespace(char *buffer){
  */
 
 char *parse_path(char *command){
-    _Bool file_found = 0;
+    bool file_found = 0;
     int error;
     size_t x = 0; // ndex
 
@@ -233,7 +235,7 @@ char *parse_path(char *command){
     if(file_found == 1){
         return concat;
     }
-
+    //printf("du?\n");
     fprintf(stderr, "brsh: %s: %s\n", command, strerror(error));
     free(concat);
     return NULL;

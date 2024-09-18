@@ -1,4 +1,4 @@
-BASE = src/main.c src/parser.c src/error.c src/pipe.c src/builtin.c src/config.c
+BASE = src/main.c src/parser.c src/error.c src/pipe.c src/builtin.c src/config.c src/signal.c
 BUILD = target
 CC = gcc
 CFLAGS = -Wall -Wno-unused-parameter -Wextra

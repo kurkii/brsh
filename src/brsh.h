@@ -38,4 +38,9 @@ void error_kill_parent(char *func, char *error, pid_t parent);
 
 int execute_builtin(char **argv);
 
+int signal_send_pipe(int filedes, int signal);
+int signal_read_pipe(int filedes);
+
+void sigint_handler(int);
+
 #endif

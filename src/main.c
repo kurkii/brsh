@@ -29,6 +29,8 @@ uint16_t delimiter_count = 0;
 
 int main(){
     
+    //signal(SIGINT, sigint_handler);
+
     config_initial_setup();
     get_config_path();
     if(read_config() != 0){
@@ -42,15 +44,16 @@ int main(){
 
         printf("%s", prompt);
 
+        char *ret = fgets(buffer, BUFFER_SIZE, stdin);
 
-          
-        fgets(buffer, BUFFER_SIZE, stdin);
+        if(ret == NULL){ // (ret == null) means EOF. can appear from eg. a CTRL-D
+            printf("\nEOF, exiting...\n");
+            exit(0);
+        }
 
         if(buffer[0] == 10){ // if input is empty
             continue;
         }
-        
-        //DEBUG_PRINTF("buffer: %s\n", buffer);
 
         parse_buffer(buffer);
         
@@ -67,7 +70,6 @@ int main(){
             }; 
 
             char *executable = parse_path(command.argv[0]);
-
 
             if(executable == NULL){
                 for(size_t x = 0; x < BUFFER_SIZE; x++){
@@ -92,49 +94,40 @@ int main(){
  
             wait(NULL);
             
-
             free(executable);
 
             for(size_t x = 0; x < BUFFER_SIZE; x++){
                 free(command.argv[x]); // free each element of the argv array
             }
 
+            
+
             free(command.argv);
 
-            
-  
             goto cleanup;
-        }else{ // pipe the two commands (eventually replace this with a dynamic thing supporting multiple pipes)
-            
-/*             command_info command1;
-            command_info command2;
+        }else{
 
-            command1 = parse_block(block_array[0]);
-            command2 = parse_block(block_array[1]);
-
-            if(command1.argv == NULL || command2.argv == NULL){
-                error_kill("main()", "argv == NULL");
-            }
-
-            pipe_two(command1.argv, command2.argv, command1.argc, command2.argc);
-
-            for(size_t x = 0; x < BUFFER_SIZE; x++){
-                free(command1.argv[x]);
-                free(command2.argv[x]);
-            }
-
-            free(command1.argv);
-            free(command2.argv);
-
-            command1.argc = 0;
-            command2.argc = 0; */
             command_info *commands = malloc(sizeof(command_info) * block_count);
 
             for(size_t i = 0; i < block_count; i++){
                 commands[i] = parse_block(block_array[i]);
             }
-
+            
             brsh_pipe(commands, delimiter_count, block_count);
+
+            /* wait for children to finish */
+            for(int i = 0; i < block_count; i++){
+                wait(NULL);
+            }
+
+            /* free everything, maybe find a better solution to memory? */
+            for(size_t i = 0; i < block_count; i++){
+                for(size_t x = 0; x < BUFFER_SIZE; x++){
+                    free(commands[i].argv[x]);
+                }
+                free(commands[i].argv);
+
+            }
 
             free(commands);
 
