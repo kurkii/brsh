@@ -3,7 +3,7 @@
     builtin.c - provides built-in functions included in the shell
 
     OUTLINE
-        - array of function pointers?
+        - array of function pointers
         - in the main file for loop check if argument is equal to a built in command
 
 */
@@ -22,6 +22,11 @@ void builtin_exit(char **argv){
 void (*func_ptr[BUILTIN_NUM])(char**) = {builtin_exit};
 
 int execute_builtin(char **argv){
+
+    if(argv == NULL){
+        return -1;
+    }
+
     _Bool was_found = 0;
     for(size_t i = 0; i < BUILTIN_NUM; i++){
         if(strcmp(argv[0], builtin_list[i]) == 0){

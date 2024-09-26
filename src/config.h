@@ -2,7 +2,13 @@
 #define CONFIG_H
 
 #include <stdint.h>
-#define BRSH_KEY_PATH_INDEX 0
+#include <stdbool.h>
+#include <stdio.h>
+enum {
+    BRSH_KEY_PATH_INDEX = 0,
+    BRSH_KEY_PROMPT_INDEX,
+    BRSH_KEY_PROMPTARGS_INDEX,
+};
 
 #define KEY_LENGTH 256
 #define VALUE_LENGTH 256
@@ -11,7 +17,7 @@
 
 #define BRSH_LINE_MAX 2048
 
-#define KEY_NUM 1
+#define KEY_NUM 3
 
 #define CONFIG_FILENAME ".brsh_config"
 
@@ -22,15 +28,15 @@ typedef struct {
         char string_value[VALUE_STRING_SIZE];
         int int_value;
         float float_value;
-        char bool_value[VALUE_BOOL_SIZE];
+        bool bool_value;
     };
 } brsh_key;
 
 enum {
     KEY_TYPE_INT = 0,
-    KEY_TYPE_STRING = 1,
-    KEY_TYPE_FLOAT = 2,
-    KEY_TYPE_BOOL = 3
+    KEY_TYPE_STRING,
+    KEY_TYPE_FLOAT,
+    KEY_TYPE_BOOL,
 };
 
 int keyname_to_index(char *name);
@@ -39,5 +45,6 @@ int read_config(void);
 void config_initial_setup();
 void get_config_path();
 brsh_key get_key(int index);
+void default_config_setup(FILE *file);
 
 #endif

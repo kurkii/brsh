@@ -9,7 +9,6 @@ enum{
   WRITE = 1,
 };
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +28,7 @@ int *create_pipefd(int num){
     exit(EXIT_FAILURE);
   }
 
-  for(size_t i = 0; i < num; i++){
+  for(int i = 0; i < num; i++){
     if(pipe(pipes + i*2) == -1){ // create the pipes
       perror("pipe() failed");
       exit(EXIT_FAILURE);
@@ -81,6 +80,7 @@ int brsh_pipe(command_info *commands, int pipe_count, int command_count){
         char *executable = parse_path(commands[i].argv[0]);
 
         if(executable == NULL){
+          fprintf(stderr, "brsh: failed to parse command\n");
           exit(EXIT_FAILURE);
         }
 

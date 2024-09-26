@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include "config.h"
 #include "brsh.h"
+#include "debug.h"
 
 extern block block_array[BUFFER_SIZE]; // global block array from main.c file, used for storing blocks. the order of the elements [0-4096] is the order in which they appear in the buffer
 extern uint16_t block_count; // global counter of the amount of blocks stored in the block array
@@ -193,22 +194,40 @@ char *remove_whitespace(char *buffer){
 char *parse_path(char *command){
     bool file_found = 0;
     int error;
-    size_t x = 0; // ndex
+
+    if(command == NULL){
+        return NULL;
+    }
+
+    if(command[0] == 0){
+        return NULL;
+    }
 
     brsh_key path_key = get_key(BRSH_KEY_PATH_INDEX);
+
+    if(path_key.name == NULL){
+        error_kill("parse_path()", "path key uninitalized");
+    }
+
     char *path = path_key.string_value;
+
+    if(path == NULL){
+        error_kill("parse_path()", "path is uninitialized");
+    }
 
     char *concat = malloc(BUFFER_SIZE * sizeof(char)); // <- remember to free
 
-    if(fopen(command, "r") != NULL){ // if the command itself points to a file
+    FILE *f = fopen(command, "r");
+    if(f != NULL){ // if the command itself points to a file
         memcpy(concat, command, strlen(command)+1); // the reason we return concat instead of directly returning command is because of a free() in the callee, which would cause a double free error
+        fclose(f);
         return concat;
     }
 
     for(size_t i = 0; i < PATH_ELEMENTS; i++){
 
         memset(concat, 0, BUFFER_SIZE*sizeof(char));
-        for(; x < PATH_MAX; x++){
+        for(size_t x = 0; x < PATH_MAX; x++){
             if(path[x] == ':'){
                 path[x] = '\0';
                 x++;
@@ -235,7 +254,7 @@ char *parse_path(char *command){
     if(file_found == 1){
         return concat;
     }
-    //printf("du?\n");
+
     fprintf(stderr, "brsh: %s: %s\n", command, strerror(error));
     free(concat);
     return NULL;
@@ -246,32 +265,59 @@ char *parse_path(char *command){
 /*
     parse_prompt()
 
-    - primitive prompt creator with the layout `user@hostname: `, will probably be removed/refactored
-    with config settings
+    - prompt creator which works in conjunction with the config file
 
 */
 char *parse_prompt(void){
-    #define PROMPT_DELIMITER "@"
+    
     char *username = getlogin();
-
-    if(username == NULL){
-        error_kill("parse_prompt()", "username == NULL");
-    }
-
     char hostname[_POSIX_HOST_NAME_MAX];
-    if(gethostname(hostname, _POSIX_HOST_NAME_MAX) == -1){
-        error_kill("parse_prompt()", "gethostname() unsuccessful");
+
+    brsh_key key = get_key(BRSH_KEY_PROMPT_INDEX);
+
+    if(key.string_value[0] == 0){
+        char *prompt = malloc(3 * sizeof(char));
+        strcpy(prompt, "$:\0");
+        return prompt;
     }
 
-    if((strlen(username) + strlen(hostname)) > BUFFER_SIZE){
-        error_kill("parse_prompt()", "buffer too small - blame me for being lazy");
+    char *prompt = key.string_value;
+
+    char *result = malloc(BUFFER_SIZE * sizeof(char));
+
+    memset(result, 0, BUFFER_SIZE);
+
+    for(size_t i = 0; i < strlen(prompt); i++){
+        if(prompt[i] == '$'){ // check for delimiter sign
+            switch (prompt[i+1]) {
+                case 'U': // username
+                    if(username == NULL){
+                        error_kill("parse_prompt()", "username == NULL");
+                    }
+
+                    strcat(result, username);
+                    i++;
+                    continue;
+                case 'H':
+                    if(gethostname(hostname, _POSIX_HOST_NAME_MAX) == -1){
+                        int error = errno;
+                        error_kill("parse_prompt(), gethostname()", strerror(error));
+                    }
+                    strcat(result, hostname);
+                    i++;
+                    continue;
+                default:
+                    fprintf(stderr, "CONFIG ERROR: '%%%c' is not a valid prompt conversion specifier!\n", prompt[i]);
+                    i++;
+                    continue;
+            }
+        }
+        
+        /* simply append the character to `result`*/
+        memcpy(result+strlen(result), &prompt[i], 1); // append character
+        memcpy(result+strlen(result)+1, "\0", 1); // append null terminator
+
     }
 
-    char *concat = malloc(BUFFER_SIZE * sizeof(char)); // FREEEEEEE
-    strcpy(concat, username);
-    strcat(concat, PROMPT_DELIMITER);
-    strcat(concat, hostname);
-    strcat(concat, ": ");
-
-    return concat;
+    return result;
 }

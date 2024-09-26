@@ -9,8 +9,8 @@
 #define COMMAND_SIZE 512 // defines the maximum size of a command or an argument
 #define PATH_ELEMENTS 2
 
-const static char* DELIMITERS[] = {"|", "&&"};
-const static char* PATH[2] = {"/bin", "/usr/bin"};
+//const static char* DELIMITERS[] = {"|", "&&"};
+ //const static char* PATH[2] = {"/bin", "/usr/bin"};
 
 enum delimiter_type {PIPE = 0, AND = 1, REDIRECT = 2};
 typedef char delimiter;

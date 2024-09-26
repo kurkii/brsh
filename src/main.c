@@ -20,12 +20,20 @@
 #include "brsh.h"
 #include "config.h"
 #include "debug.h"
+
 char buffer[BUFFER_SIZE];
 
 block block_array[BUFFER_SIZE] = {NULL};
 uint16_t block_count = 0;
 delimiter delimiter_array[BUFFER_SIZE] = {0};
 uint16_t delimiter_count = 0;
+
+/* TO FIX:
+
+  - FIXED random segfaults when inputing in a non existant executable as the first command
+  - FIXED? pipe not working after inputing a non existant executable
+
+*/
 
 int main(){
     
@@ -41,9 +49,7 @@ int main(){
     char* prompt = parse_prompt();
 
     for(;;){
-
-        printf("%s", prompt);
-
+        printf("%s ", prompt);
         char *ret = fgets(buffer, BUFFER_SIZE, stdin);
 
         if(ret == NULL){ // (ret == null) means EOF. can appear from eg. a CTRL-D
@@ -56,7 +62,7 @@ int main(){
         }
 
         parse_buffer(buffer);
-        
+   
         if(delimiter_count == 0){ // if there is no piping/redirections happening, simply execute the command
             command_info command = parse_block(block_array[0]);
             
@@ -66,18 +72,17 @@ int main(){
                 }
 
                 free(command.argv);
-                continue;
+                goto cleanup;
             }; 
 
             char *executable = parse_path(command.argv[0]);
-
             if(executable == NULL){
                 for(size_t x = 0; x < BUFFER_SIZE; x++){
                     free(command.argv[x]); // free each element of the argv array
                 }
 
                 free(command.argv);
-                continue;
+                goto cleanup;
             }
             
             pid_t p = fork();
@@ -99,8 +104,6 @@ int main(){
             for(size_t x = 0; x < BUFFER_SIZE; x++){
                 free(command.argv[x]); // free each element of the argv array
             }
-
-            
 
             free(command.argv);
 
@@ -139,7 +142,5 @@ int main(){
         strcpy(delimiter_array, "");
         delimiter_count = 0;
     }
-
-    free(prompt);
 }
 
